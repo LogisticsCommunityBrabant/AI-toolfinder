@@ -4,582 +4,349 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Tool Finder voor Logistiek</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js" data-type="module"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: system-ui, sans-serif; }
+        .fade { animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    </style>
 </head>
-<body>
-    <div id="root"></div>
-    <script type="text/babel">
-        const { useState } = React;
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-6">
+<div id="app" class="max-w-3xl mx-auto"></div>
 
-        function TransportAIToolFinder() {
-            const [currentScreen, setCurrentScreen] = useState('intro');
-            const [questionStep, setQuestionStep] = useState(0);
-            const [viewingProcessInfo, setViewingProcessInfo] = useState(false);
-            const [processInfoStep, setProcessInfoStep] = useState(0);
-            const [formData, setFormData] = useState({
-                bedrijfsnaam: '', proces: '', procesAnders: '', pijnpunt: [], 
-                specifiekeDoel: '', oplossingstype: '', digitalisatiegraad: '', budget: '', budgetJaarlijks: '',
-                roiVerwachting: '', medewerkers: '', groeiVerwachting: '', urgentie: '',
-                technischeKennis: '', trainingVoorkeur: '', integratie: '', systeemNaam: '',
-                dataGevoeligheid: [], herkomst: '', herkomstAnders: ''
-            });
-            const [generatedPrompt, setGeneratedPrompt] = useState('');
+<script>
+const questions = [
+    { id: 'bedrijfsnaam', question: 'Wat is de naam van uw bedrijf?', type: 'text', placeholder: 'Bijv. Transport Solutions BV' },
+    { id: 'proces', question: 'Welk proces wilt u verbeteren met AI-tools?', type: 'select', options: ['Forecasting','Order Entry','Transport selectie/modaliteitskeuze','Enkelvoudige transportplanning','Complexe transportplanning','Documentatie','Goederen voorbereiding','Transport uitvoering','Goederen afleveren','Facturatie en afwikkeling','Dashboarding','Samenwerking en communicatie','Anders'] },
+    { id: 'procesAnders', question: 'Kunt u aangeven welk ander proces u wilt verbeteren?', type: 'textarea', placeholder: 'Beschrijf het proces', conditional: true, showWhen: { field: 'proces', value: 'Anders' } },
+    { id: 'pijnpunt', question: 'Wat is uw grootste uitdaging? (meerdere antwoorden mogelijk)', type: 'multiselect', options: ['Te tijdrovend/handmatig werk','Te veel fouten','Geen real-time inzicht','Slechte communicatie met klanten/partners','Hoge operationele kosten','Anders'], optional: true },
+    { id: 'specifiekeDoel', question: 'Kunt u het doel specifieker omschrijven?', type: 'textarea', placeholder: 'Bijv. We willen onze rijtijden met 15% verkorten en brandstofkosten verlagen' },
+    { id: 'oplossingstype', question: 'Wat voor type oplossing zoekt u?', type: 'select', options: ['Zelfstandige AI-tool (specifiek voor één functie)','AI-functionaliteit binnen bestaand systeem (TMS/WMS/ERP met AI)','Complete softwaresystemen met AI-ondersteuning','Geen voorkeur - alle opties tonen','Anders'] },
+    { id: 'digitalisatiegraad', question: 'Hoe digitaal werkt uw bedrijf momenteel?', type: 'select', options: ['Voornamelijk papier en Excel','Mix van papier en digitale systemen','Grotendeels gedigitaliseerd met losse systemen','Volledig geïntegreerd digitaal ecosysteem','Anders'] },
+    { id: 'budget', question: 'Wat is uw eenmalige investeringsbudget?', type: 'select', options: ['Minder dan €2.500','€2.500 - €10.000','€10.000 - €25.000','€25.000 - €75.000','€75.000 - €150.000','Meer dan €150.000','Anders'] },
+    { id: 'budgetJaarlijks', question: 'Wat is uw jaarlijks budget voor licenties en onderhoud?', type: 'select', options: ['Minder dan €1.000 per jaar','€1.000 - €5.000 per jaar','€5.000 - €15.000 per jaar','€15.000 - €30.000 per jaar','Meer dan €30.000 per jaar','Anders'] },
+    { id: 'roiVerwachting', question: 'Binnen welke termijn verwacht u rendement te zien?', type: 'select', options: ['Direct (binnen 3 maanden)','Kort (3-6 maanden)','Middellang (6-12 maanden)','Lang (1-2 jaar)','Onbekend','Anders'] },
+    { id: 'medewerkers', question: 'Hoeveel medewerkers zullen de tool gebruiken?', type: 'select', options: ['1-5 medewerkers','6-15 medewerkers','16-50 medewerkers','Meer dan 50 medewerkers','Anders'] },
+    { id: 'groeiVerwachting', question: 'Verwacht u groei in de komende 2 jaar?', type: 'select', options: ['Nee, huidige schaal blijft gelijk','Ja, matige groei (0-5%)','Ja, sterke groei (6-15%)','Ja, zeer sterke groei (16-25%)','Ja, extreme groei (25%+)','Anders'] },
+    { id: 'urgentie', question: 'Hoe urgent is de implementatie?', type: 'select', options: ['Direct nodig (binnen 1 maand)','Op korte termijn (1-3 maanden)','Middellange termijn (3-6 maanden)','Verkenningsfase (6+ maanden)','Anders'] },
+    { id: 'technischeKennis', question: 'Hoe is de technische kennis binnen uw bedrijf?', type: 'select', options: ['Beperkt - we hebben externe ondersteuning nodig','Gemiddeld - basis IT-kennis aanwezig','Goed - ervaren met software implementaties','Uitstekend - eigen IT-afdeling','Anders'] },
+    { id: 'trainingVoorkeur', question: 'Welke vorm van training en ondersteuning heeft u nodig?', type: 'textarea', placeholder: 'Bijv. online training sessies, on-site training, dedicated account manager, etc.' },
+    { id: 'integratie', question: 'Moet de tool integreren met bestaande systemen?', type: 'select', options: ['Ja, met TMS (Transport Management Systeem)','Ja, met ERP-systeem','Ja, met WMS-systeem','Ja, met boekhoudsoftware','Ja, met meerdere systemen','Nee, standalone oplossing is voldoende','Weet ik niet zeker','Anders'] },
+    { id: 'systeemNaam', question: 'Met welk systeem of systemen moet de tool integreren?', type: 'textarea', placeholder: 'Bijv. SAP ERP, Exact Online, TransFollow TMS, etc.', conditional: true, showWhen: { field: 'integratie', values: ['Ja, met TMS (Transport Management Systeem)','Ja, met ERP-systeem','Ja, met WMS-systeem','Ja, met boekhoudsoftware','Ja, met meerdere systemen'] } },
+    { id: 'dataGevoeligheid', question: 'Verwerkt u gevoelige data? (meerdere antwoorden mogelijk)', type: 'multiselect', options: ['Nee, standaard bedrijfsdata','Ja, klantgegevens (AVG-gevoelig)','Ja, financiële data','Ja, contractuele/vertrouwelijke informatie','Weet ik niet zeker','Anders'], optional: true },
+    { id: 'herkomst', question: 'Heeft u een voorkeur voor de herkomst van de AI-tool?', type: 'select', options: ['Geen voorkeur - beste oplossing telt','Bij voorkeur Nederlandse aanbieder','Bij voorkeur Europese aanbieder','Bij voorkeur buiten Europa','Anders'] },
+    { id: 'herkomstAnders', question: 'Kunt u uw voorkeur voor herkomst toelichten?', type: 'textarea', placeholder: 'Bijv. alleen aanbieders uit specifieke landen', conditional: true, showWhen: { field: 'herkomst', value: 'Anders' } }
+];
 
-            const processDescriptions = [
-                { name: 'Forecasting', description: 'Het voorspellen van transportvraag en capaciteitsbehoefte op basis van historische data en trends. AI kan patronen herkennen en nauwkeurige voorspellingen doen voor betere planning.' },
-                { name: 'Order Entry', description: 'Het registreren en verwerken van transportopdrachten in het systeem. AI kan handmatige invoer automatiseren, fouten verminderen en orders sneller verwerken.' },
-                { name: 'Transport selectie/modaliteitskeuze', description: 'Het kiezen van de juiste vervoerswijze (weg, rail, water, lucht) en vervoerder voor een specifieke opdracht. AI helpt de meest efficiënte en kosteneffectieve keuze te maken.' },
-                { name: 'Enkelvoudige transportplanning', description: 'Het optimaliseren van individuele routes om tijd en brandstof te besparen. AI-algoritmes berekenen de beste route rekening houdend met verkeer, weersomstandigheden en restricties.' },
-                { name: 'Complexe transportplanning', description: 'Het bundelen van vrachten en ladingen, en samenwerken met andere partijen voor efficiënte planning. AI helpt bij het vinden van optimale combinaties en samenwerkingsmogelijkheden.' },
-                { name: 'Documentatie', description: 'Het genereren, beheren en archiveren van transportdocumenten zoals CMR, facturen en douanepapieren. AI kan documenten automatisch genereren, scannen en verwerken.' },
-                { name: 'Goederen voorbereiding', description: 'Het fysieke proces van laden, picken en klaarzetten van goederen. AI-tools ondersteunen met computer vision, robotica en slimme systemen om werkdruk te verlagen en fouten te minimaliseren.' },
-                { name: 'Transport uitvoering', description: 'Het real-time monitoren en bijsturen van transporten onderweg. AI biedt live tracking, voorspelt vertragingen en stelt automatisch alternatieve routes voor.' },
-                { name: 'Goederen afleveren', description: 'Het fysieke afleverproces met ondersteuning voor efficiëntie en foutreductie. Denk aan digitale handtekeningen, automatische foto\'s, bewijs van levering en slimme routering voor bezorgers.' },
-                { name: 'Facturatie en afwikkeling', description: 'Het automatisch genereren van facturen en afhandelen van betalingen. AI kan facturen genereren op basis van gerealiseerde transporten en betalingen automatisch verwerken.' },
-                { name: 'Dashboarding', description: 'Het visualiseren van KPI\'s, prestaties en bedrijfsdata voor betere besluitvorming. AI-dashboards tonen real-time inzichten en voorspellingen voor proactief management.' },
-                { name: 'Samenwerking en communicatie', description: 'Het delen van informatie met klanten, chauffeurs en andere stakeholders. Inclusief AI-chatbots voor klantenservice, geautomatiseerde updates en slimme communicatietools die vragen begrijpen en beantwoorden.' }
-            ];
+const state = {
+    screen: 'intro', // intro | tips | questions | result
+    step: 0,
+    formData: {},
+    prompt: ''
+};
 
-            const questions = [
-                { id: 'bedrijfsnaam', question: 'Wat is de naam van uw bedrijf?', type: 'text', placeholder: 'Bijv. Transport Solutions BV' },
-                { id: 'proces', question: 'Welk proces wilt u verbeteren met AI-tools?', type: 'select', options: ['Forecasting', 'Order Entry', 'Transport selectie/modaliteitskeuze', 'Enkelvoudige transportplanning', 'Complexe transportplanning', 'Documentatie', 'Goederen voorbereiding', 'Transport uitvoering', 'Goederen afleveren', 'Facturatie en afwikkeling', 'Dashboarding', 'Samenwerking en communicatie', 'Anders'], hasInfo: true },
-                { id: 'procesAnders', question: 'Kunt u aangeven welk ander proces u wilt verbeteren?', type: 'textarea', placeholder: 'Beschrijf het proces dat u wilt verbeteren', conditional: true, showWhen: ['Anders'] },
-                { id: 'pijnpunt', question: 'Wat is momenteel uw grootste uitdaging in dit proces? (meerdere antwoorden mogelijk)', type: 'multiselect', options: ['Te tijdrovend/handmatig werk', 'Te veel fouten', 'Geen real-time inzicht', 'Slechte communicatie met klanten/partners', 'Hoge operationele kosten', 'Anders'], optional: true },
-                { id: 'specifiekeDoel', question: 'Kunt u het doel specifieker omschrijven?', type: 'textarea', placeholder: 'Bijv. We willen onze rijtijden met 15% verkorten en brandstofkosten verlagen' },
-                { id: 'oplossingstype', question: 'Wat voor type oplossing zoekt u?', type: 'select', options: ['Zelfstandige AI-tool (specifiek voor één functie)', 'AI-functionaliteit binnen bestaand systeem (TMS/WMS/ERP met AI)', 'Complete softwaresystemen met AI-ondersteuning', 'Geen voorkeur - alle opties tonen', 'Anders'] },
-                { id: 'digitalisatiegraad', question: 'Hoe digitaal werkt uw bedrijf momenteel?', type: 'select', options: ['Voornamelijk papier en Excel', 'Mix van papier en digitale systemen', 'Grotendeels gedigitaliseerd met losse systemen', 'Volledig geïntegreerd digitaal ecosysteem', 'Anders'] },
-                { id: 'budget', question: 'Wat is uw eenmalige investeringsbudget (aanschaf/implementatie)?', type: 'select', options: ['Minder dan €2.500', '€2.500 - €10.000', '€10.000 - €25.000', '€25.000 - €75.000', '€75.000 - €150.000', 'Meer dan €150.000', 'Anders'] },
-                { id: 'budgetJaarlijks', question: 'Wat is uw jaarlijks budget voor licenties en onderhoud?', type: 'select', options: ['Minder dan €1.000 per jaar', '€1.000 - €5.000 per jaar', '€5.000 - €15.000 per jaar', '€15.000 - €30.000 per jaar', 'Meer dan €30.000 per jaar', 'Anders'] },
-                { id: 'roiVerwachting', question: 'Binnen welke termijn verwacht u rendement te zien?', type: 'select', options: ['Direct (binnen 3 maanden)', 'Kort (3-6 maanden)', 'Middellang (6-12 maanden)', 'Lang (1-2 jaar)', 'Onbekend', 'Anders'] },
-                { id: 'medewerkers', question: 'Hoeveel medewerkers zullen de tool gebruiken?', type: 'select', options: ['1-5 medewerkers', '6-15 medewerkers', '16-50 medewerkers', 'Meer dan 50 medewerkers', 'Anders'] },
-                { id: 'groeiVerwachting', question: 'Verwacht u groei in de komende 2 jaar?', type: 'select', options: ['Nee, huidige schaal blijft gelijk', 'Ja, matige groei (0-5%)', 'Ja, sterke groei (6-15%)', 'Ja, zeer sterke groei (16-25%)', 'Ja, extreme groei (25%+)', 'Anders'] },
-                { id: 'urgentie', question: 'Hoe urgent is de implementatie?', type: 'select', options: ['Direct nodig (binnen 1 maand)', 'Op korte termijn (1-3 maanden)', 'Middellange termijn (3-6 maanden)', 'Verkenningsfase (6+ maanden)', 'Anders'] },
-                { id: 'technischeKennis', question: 'Hoe is de technische kennis binnen uw bedrijf?', type: 'select', options: ['Beperkt - we hebben externe ondersteuning nodig', 'Gemiddeld - basis IT-kennis aanwezig', 'Goed - ervaren met software implementaties', 'Uitstekend - eigen IT-afdeling', 'Anders'] },
-                { id: 'trainingVoorkeur', question: 'Welke vorm van training en ondersteuning heeft u nodig?', type: 'textarea', placeholder: 'Bijv. online training sessies, on-site training, dedicated account manager, etc.' },
-                { id: 'integratie', question: 'Moet de tool integreren met bestaande systemen?', type: 'select', options: ['Ja, met TMS (Transport Management Systeem)', 'Ja, met ERP-systeem', 'Ja, met WMS-systeem', 'Ja, met boekhoudsoftware', 'Ja, met meerdere systemen', 'Nee, standalone oplossing is voldoende', 'Weet ik niet zeker', 'Anders'] },
-                { id: 'systeemNaam', question: 'Met welk systeem of welke systemen moet de tool kunnen integreren?', type: 'textarea', placeholder: 'Bijv. SAP ERP, Exact Online, TransFollow TMS, etc.', conditional: true, showWhen: ['Ja, met TMS (Transport Management Systeem)', 'Ja, met ERP-systeem', 'Ja, met WMS-systeem', 'Ja, met boekhoudsoftware', 'Ja, met meerdere systemen'] },
-                { id: 'dataGevoeligheid', question: 'Verwerkt u gevoelige data waarvoor extra beveiligingseisen gelden? (meerdere antwoorden mogelijk)', type: 'multiselect', options: ['Nee, standaard bedrijfsdata', 'Ja, klantgegevens (AVG-gevoelig)', 'Ja, financiële data', 'Ja, contractuele/vertrouwelijke informatie', 'Weet ik niet zeker', 'Anders'], optional: true },
-                { id: 'herkomst', question: 'Heeft u een voorkeur voor de herkomst van de AI-tool?', type: 'select', options: ['Geen voorkeur - beste oplossing telt', 'Bij voorkeur Nederlandse aanbieder', 'Bij voorkeur Europese aanbieder', 'Bij voorkeur buiten Europa', 'Anders'] },
-                { id: 'herkomstAnders', question: 'Kunt u uw voorkeur voor herkomst toelichten?', type: 'textarea', placeholder: 'Bijv. alleen aanbieders uit specifieke landen, of juist bepaalde landen uitsluiten', conditional: true, showWhen: ['Anders'] }
-            ];
+function isQuestionVisible(q) {
+    if (!q.conditional) return true;
+    const sw = q.showWhen;
+    const val = state.formData[sw.field] || '';
+    if (sw.value) return val === sw.value;
+    if (sw.values) return sw.values.includes(val);
+    return true;
+}
 
-            const handleMultiSelectChange = (id, option) => {
-                const currentValues = formData[id] || [];
-                const isSelected = currentValues.includes(option);
-                if (isSelected) {
-                    setFormData({...formData, [id]: currentValues.filter(v => v !== option)});
-                } else {
-                    setFormData({...formData, [id]: [...currentValues, option]});
-                }
-            };
+function getVisibleStep(from, dir) {
+    let s = from + dir;
+    while (s >= 0 && s < questions.length) {
+        if (isQuestionVisible(questions[s])) return s;
+        s += dir;
+    }
+    return -1;
+}
 
-            const generatePrompt = () => {
-                const procesText = formData.proces === 'Anders' ? formData.procesAnders : formData.proces;
-                const pijnpuntText = Array.isArray(formData.pijnpunt) ? formData.pijnpunt.join(', ') : formData.pijnpunt;
-                const dataGevoeligheidText = Array.isArray(formData.dataGevoeligheid) ? formData.dataGevoeligheid.join(', ') : formData.dataGevoeligheid;
-                
-                const prompt = `# AI Tool Zoekopdracht voor ${formData.bedrijfsnaam || 'Transportbedrijf'}
+function generatePrompt() {
+    const fd = state.formData;
+    const procesText = fd.proces === 'Anders' ? (fd.procesAnders || '') : (fd.proces || '');
+    const pijnpunt = Array.isArray(fd.pijnpunt) ? fd.pijnpunt.join(', ') : '';
+    const dataGev = Array.isArray(fd.dataGevoeligheid) ? fd.dataGevoeligheid.join(', ') : '';
+
+    return `# AI Tool Zoekopdracht voor ${fd.bedrijfsnaam || 'Transportbedrijf'}
 
 ## BELANGRIJKE CONTEXT
-Dit bedrijf is actief in de **logistiek sector**. ALLE aanbevolen AI-tools MOETEN specifiek geschikt zijn voor logistieke bedrijven, of minimaal bewezen toepassingen hebben in deze sector. Geen generieke business tools, tenzij ze expliciet logistiek functionaliteit hebben.
+Dit bedrijf is actief in de logistiek sector. ALLE aanbevolen AI-tools MOETEN specifiek geschikt zijn voor logistieke bedrijven.
 
 ## Bedrijfsprofiel
-- **Sector**: Logistiek (MKB)
-- **Aantal gebruikers**: ${formData.medewerkers}
-- **Groei verwachting**: ${formData.groeiVerwachting}
-- **Huidige digitalisatie**: ${formData.digitalisatiegraad}
-- **Technisch niveau**: ${formData.technischeKennis}
+- Sector: Logistiek (MKB)
+- Aantal gebruikers: ${fd.medewerkers || '-'}
+- Groei verwachting: ${fd.groeiVerwachting || '-'}
+- Huidige digitalisatie: ${fd.digitalisatiegraad || '-'}
+- Technisch niveau: ${fd.technischeKennis || '-'}
 
 ## Te verbeteren proces
-**Hoofdproces**: ${procesText}
+- Hoofdproces: ${procesText}
+- Grootste uitdaging: ${pijnpunt}
+- Specifiek doel: ${fd.specifiekeDoel || '-'}
+- Type oplossing: ${fd.oplossingstype || '-'}
 
-**Grootste uitdaging**: ${pijnpuntText}
+## Zoekcriteria
+- Eenmalig budget: ${fd.budget || '-'}
+- Jaarlijks budget: ${fd.budgetJaarlijks || '-'}
+- ROI verwachting: ${fd.roiVerwachting || '-'}
+- Implementatie urgentie: ${fd.urgentie || '-'}
+- Integratie: ${fd.integratie || '-'}
+${fd.systeemNaam ? `- Specifieke systemen: ${fd.systeemNaam}` : ''}
+- Data gevoeligheid: ${dataGev}
+- Voorkeur herkomst: ${fd.herkomst || '-'}
+- Training voorkeur: ${fd.trainingVoorkeur || '-'}
 
-**Specifiek doel**: ${formData.specifiekeDoel}
-
-**Transport/logistiek context**: ${procesText === formData.procesAnders ? 'Dit is een specifiek logistiek proces dat verbeterd moet worden met AI' : 'Dit is een standaard logistiek proces'}
-
-**Type oplossing**: ${formData.oplossingstype}
-
-## Zoekcriteria voor AI-tools
-
-### Budget en Implementatie
-- **Eenmalig budget (aanschaf/implementatie)**: ${formData.budget}
-- **Jaarlijks budget (licenties/onderhoud)**: ${formData.budgetJaarlijks}
-- **ROI verwachting**: ${formData.roiVerwachting}
-- **Implementatietijd**: ${formData.urgentie}
-- **Integratie-eisen**: ${formData.integratie}
-${formData.systeemNaam ? `- **Specifieke systemen**: ${formData.systeemNaam}` : ''}
-- **Data gevoeligheid**: ${dataGevoeligheidText}
-- **Voorkeur herkomst**: ${formData.herkomst}
-${formData.herkomstAnders ? `- **Toelichting herkomst**: ${formData.herkomstAnders}` : ''}
-
-### Training en Ondersteuning
-- **Gewenste training**: ${formData.trainingVoorkeur}
-- **Technische kennis team**: ${formData.technischeKennis}
-
-### Gezochte functionaliteiten
-Zoek naar AI-tools die specifiek geschikt zijn voor:
-1. ${procesText} in de logistiek sector
-2. MKB-vriendelijk (niet te complex, betaalbaar)
-3. ${formData.integratie.includes('Ja') ? 'Met integratiemogelijkheden' : 'Als standalone oplossing'}
-4. Geschikt voor teams van ${formData.medewerkers}
-5. Type oplossing: ${formData.oplossingstype}
-
-**VERPLICHT - LOGISTIEK FOCUS**: 
-- Alle tools MOETEN specifiek ontwikkeld zijn voor logistiek, OF
-- Bewezen succesverhalen hebben in logistiek sector, OF  
-- Specifieke functionaliteit bieden die direct relevant is voor logistieke operaties (routing, load matching, carrier selection, freight optimization, warehouse management, etc.)
-- GEEN generieke CRM, sales of marketing tools zonder logistiek-specifieke features
-
-**Voorbeelden van GOEDE logistiek AI-tools**:
-- Route optimalisatie tools
-- Freight matching platforms  
-- TMS/WMS systemen met AI
-- Load planning software
-- Predictive maintenance voor voertuigen
-- Dynamic pricing voor vracht
-- Warehouse automation met AI
-- Document processing voor logistieke documenten
-- Supply chain visibility platforms
-
-**Voorbeelden van SLECHTE matches** (niet acceptabel):
-- Algemene CRM systemen zonder logistiek integratie
-- Standaard marketing automation tools
-- Generieke sales platforms
-- Basis chatbots zonder logistiek kennis
-
-**BELANGRIJK**: Geef een lijst van minimaal 10 verschillende AI-tools die aan deze criteria voldoen. Sorteer ze op relevantie en geschiktheid voor het specifieke proces. Let vooral op het gewenste oplossingstype: ${formData.oplossingstype}
-
-### Belangrijke selectiecriteria
-- **Gebruiksvriendelijkheid**: Moet passen bij ${formData.technischeKennis.toLowerCase()}
-- **Eenmalige investering**: Binnen budgetrange ${formData.budget}
-- **Jaarlijkse kosten**: Binnen budgetrange ${formData.budgetJaarlijks}
-- **ROI**: Rendement binnen ${formData.roiVerwachting.toLowerCase()}
-- **Implementatietijd**: Realistisch voor ${formData.urgentie.toLowerCase()}
-- **Schaalbaarheid**: ${formData.groeiVerwachting}
-- **Training & Support**: ${formData.trainingVoorkeur}
-- **Data beveiliging**: ${formData.dataGevoeligheid}
-- **Nederlandse ondersteuning**: Bij voorkeur beschikbaar
-
-### Zoektermen voor online research
-Gebruik deze zoektermen in zoekmachines om LOGISTIEK-SPECIFIEKE AI-tools te vinden:
-- "AI tools ${procesText} logistiek"
-- "logistics management software AI ${procesText}"
-- "logistics AI solutions ${procesText}"
-- "supply chain ${procesText} AI automation"
-- "TMS WMS with AI for ${procesText}"
-- "logistics ${procesText} artificial intelligence"
-- "warehousing ${procesText} machine learning"
-- "AI oplossingen logistiek Nederland ${procesText}"
-
-### Te evalueren aspecten bij gevonden tools
-Voor elke tool in de lijst van minimaal 10 opties, evalueer:
-1. **Logistiek Specificiteit**: Is dit echt een logistiek tool of generieke software? (KRITISCH)
-2. Functionaliteit: Dekt het onze specifieke behoefte in logistiek context?
-3. Bewezen in logistiek: Zijn er klanten/cases in logistiek sector?
-4. Kosten: Totale kosten (licentie + implementatie + training)
-5. Gebruiksvriendelijkheid: Demo beschikbaar?
-6. Referenties: Ervaringen van vergelijkbare logistieke bedrijven
-7. Support: Beschikbaarheid Nederlandse support
-8. Integratie: ${formData.integratie}
-9. Proefperiode: Mogelijkheid tot testen voor aankoop
-
-### Gewenste output
-Geef een overzicht van minimaal 10 AI-tools **die specifiek voor logistiek ontwikkeld zijn** in een gestructureerde lijst met voor elke tool:
-- Naam van de tool
-- Korte beschrijving (2-3 zinnen) - **vermeld expliciet hoe het logistiek-specifiek is**
-- Belangrijkste functionaliteiten **met focus op logistieke operaties**
+## Gevraagde output
+Geef een lijst van minimaal 10 AI-tools specifiek voor logistiek die passen bij bovenstaand profiel. Maak voor elke tool:
+- Naam en korte beschrijving (2-3 zinnen)
+- Hoofdfunctionaliteiten
 - Geschatte kosten
-- **Logistiek sector bewijs**: Noem minimaal 1 voorbeeld van gebruik in logistiek
+- Voorbeeld van gebruik in logistiek
 - Sterke punten en aandachtspunten
-- Geschiktheid voor dit specifieke pijnpunt: ${pijnpuntText}
-- Link naar website (indien beschikbaar)
+- Link naar website
 
-**LET OP**: Als je geen 10 logistiek-specifieke AI-tools kunt vinden die passen bij het proces "${procesText}", geef dan aan waarom en suggereer gerelateerde logistieke processen waar wel geschikte AI-tools voor bestaan.
+Sluit af met een vergelijkingstabel met scores (1-5) voor: prijs-kwaliteit, gebruiksvriendelijkheid, functionaliteit, support en schaalbaarheid. Sorteer op totaalscore.
 
-**VERPLICHT: Maak een vergelijkingstabel** met alle 10+ tools en geef scores (1-5 sterren) voor:
-- Prijs-kwaliteit verhouding
-- Gebruiksvriendelijkheid
-- Functionaliteit
-- Support & Training
-- Integratiemogelijkheden
-- Schaalbaarheid
-- **Totaalscore** (gemiddelde van bovenstaande)
+Geef voor de top 3 tools ook een implementatieadvies met stappen, tijdlijn en valkuilen.`;
+}
 
-Sorteer de tabel op totaalscore (hoogste bovenaan) zodat de beste opties direct zichtbaar zijn.
+function render() {
+    const app = document.getElementById('app');
+    const { screen, step, formData } = state;
 
-### Uitsluitingscriteria
-Sluit tools uit die:
-- Alleen geschikt zijn voor grote enterprises (niet MKB-vriendelijk)
-- Buiten de opgegeven budgetrange vallen
-- Niet voldoen aan de opgegeven data beveiligingseisen
-- Niet passen bij de huidige digitalisatiegraad: ${formData.digitalisatiegraad}
-- GEEN bewezen toepassing hebben in de logistiek sector
-
-### Implementatie advies
-Geef voor de top 3 meest geschikte tools:
-1. Geschatte implementatietijd
-2. Belangrijkste implementatiestappen
-3. Veelvoorkomende valkuilen
-4. Concrete vragen om te stellen tijdens demo's
-
----
-
-**Tip**: Start met het aanvragen van demo's bij minimaal 3 verschillende aanbieders voordat u een definitieve keuze maakt.`;
-
-                setGeneratedPrompt(prompt.trim());
-                setCurrentScreen('result');
-            };
-
-            const nextStep = () => {
-                if (questionStep >= questions.length - 1) { generatePrompt(); return; }
-                const currentQ = questions[questionStep];
-                if (currentQ && currentQ.conditional && currentQ.showWhen) {
-                    let previousAnswer;
-                    if (currentQ.id === 'procesAnders') previousAnswer = formData['proces'];
-                    else if (currentQ.id === 'systeemNaam') previousAnswer = formData['integratie'];
-                    else if (currentQ.id === 'herkomstAnders') previousAnswer = formData['herkomst'];
-                    if (!currentQ.showWhen.includes(previousAnswer)) { setQuestionStep(questionStep + 1); return; }
-                }
-                let nextStepNum = questionStep + 1;
-                while (nextStepNum < questions.length) {
-                    const nextQ = questions[nextStepNum];
-                    if (nextQ.conditional && nextQ.showWhen) {
-                        let relevantAnswer;
-                        if (nextQ.id === 'procesAnders') relevantAnswer = formData['proces'];
-                        else if (nextQ.id === 'systeemNaam') relevantAnswer = formData['integratie'];
-                        else if (nextQ.id === 'herkomstAnders') relevantAnswer = formData['herkomst'];
-                        if (!nextQ.showWhen.includes(relevantAnswer)) { nextStepNum++; continue; }
-                    }
-                    break;
-                }
-                if (nextStepNum >= questions.length) { generatePrompt(); } 
-                else { setQuestionStep(nextStepNum); }
-            };
-
-            const skipQuestion = () => {
-                if (questionStep < questions.length - 1) { setQuestionStep(questionStep + 1); }
-                else { generatePrompt(); }
-            };
-
-            const prevStep = () => {
-                if (questionStep === 0) { setCurrentScreen('tips'); }
-                else if (questionStep > 0) { setQuestionStep(questionStep - 1); }
-            };
-
-            const resetTool = () => {
-                setCurrentScreen('intro'); setQuestionStep(0);
-                setFormData({
-                    bedrijfsnaam: '', proces: '', procesAnders: '', pijnpunt: [], specifiekeDoel: '', 
-                    oplossingstype: '', digitalisatiegraad: '', budget: '', budgetJaarlijks: '', roiVerwachting: '', 
-                    medewerkers: '', groeiVerwachting: '', urgentie: '', technischeKennis: '', 
-                    trainingVoorkeur: '', integratie: '', systeemNaam: '', dataGevoeligheid: [], 
-                    herkomst: '', herkomstAnders: ''
-                });
-                setGeneratedPrompt('');
-            };
-
-            const copyToClipboard = () => {
-                navigator.clipboard.writeText(generatedPrompt);
-                alert('Prompt gekopieerd naar klembord!');
-            };
-
-            const currentQuestion = questionStep >= 0 && questionStep < questions.length ? questions[questionStep] : null;
-            let progress = 0;
-            if (currentScreen === 'intro') progress = 0;
-            else if (currentScreen === 'tips') progress = 5;
-            else if (currentScreen === 'result') progress = 100;
-            else progress = ((questionStep + 1) / (questions.length + 1)) * 100;
-
-            if (viewingProcessInfo) {
-                const currentProcess = processDescriptions[processInfoStep];
-                const processProgress = ((processInfoStep + 1) / processDescriptions.length) * 100;
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-                        <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-xl p-8">
-                            <div className="flex items-center gap-3 mb-6">
-                                <span className="text-4xl">🚚</span>
-                                <div>
-                                    <h1 className="text-3xl font-bold text-gray-800">Uitleg Transportprocessen</h1>
-                                    <p className="text-gray-600">Leer meer over elk proces</p>
-                                </div>
-                            </div>
-                            <div className="mb-8">
-                                <div className="w-full bg-gray-200 rounded-full h-2">
-                                    <div className="bg-blue-600 h-2 rounded-full transition-all" style={{width: `${processProgress}%`}}></div>
-                                </div>
-                                <p className="text-sm text-gray-600 mt-2">Proces {processInfoStep + 1} van {processDescriptions.length}</p>
-                            </div>
-                            <div className="mb-8 bg-blue-50 border-l-4 border-blue-600 p-6 rounded-lg">
-                                <h2 className="text-2xl font-bold text-blue-900 mb-4">{currentProcess.name}</h2>
-                                <p className="text-gray-700 leading-relaxed text-lg mb-4">{currentProcess.description}</p>
-                                <button onClick={() => {setFormData({...formData, proces: currentProcess.name}); setViewingProcessInfo(false); setProcessInfoStep(0);}}
-                                    className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
-                                    ✓ Kies dit proces
-                                </button>
-                            </div>
-                            <div className="flex gap-4">
-                                {processInfoStep > 0 && (
-                                    <button onClick={() => setProcessInfoStep(processInfoStep - 1)} 
-                                        className="flex items-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold">
-                                        ← Vorige
-                                    </button>
-                                )}
-                                {processInfoStep < processDescriptions.length - 1 ? (
-                                    <button onClick={() => setProcessInfoStep(processInfoStep + 1)}
-                                        className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
-                                        Volgende proces →
-                                    </button>
-                                ) : (
-                                    <button onClick={() => {setViewingProcessInfo(false); setProcessInfoStep(0);}}
-                                        className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
-                                        ✓ Terug naar vragen
-                                    </button>
-                                )}
-                            </div>
-                            <button onClick={() => {setViewingProcessInfo(false); setProcessInfoStep(0);}}
-                                className="w-full mt-4 px-6 py-2 text-gray-600 hover:text-gray-800 transition">
-                                ← Direct terug naar vragen
-                            </button>
-                        </div>
-                    </div>
-                );
-            }
-
-            if (generatedPrompt && currentScreen === 'result') {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-                        <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-xl p-8">
-                            <div className="flex items-center gap-3 mb-6">
-                                <span className="text-4xl">📄</span>
-                                <h2 className="text-2xl font-bold text-gray-800">Uw Gepersonaliseerde Zoekprompt</h2>
-                            </div>
-                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6 max-h-96 overflow-y-auto">
-                                <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono">{generatedPrompt}</pre>
-                            </div>
-                            <div className="mb-6 bg-blue-50 border-l-4 border-blue-600 p-6 rounded-lg">
-                                <h3 className="font-semibold text-blue-900 mb-3">📋 Volgende stap: Gebruik de prompt</h3>
-                                <p className="text-gray-700 mb-3">
-                                    Kopieer de prompt hieronder en plak deze in een AI-chatbot naar keuze. De chatbot zal u helpen de beste AI-tools voor uw specifieke situatie te vinden.
-                                </p>
-                                <p className="text-gray-700 mb-2 font-semibold">Aanbevolen AI-chatbots:</p>
-                                <ul className="list-disc list-inside ml-4 text-gray-600 space-y-1">
-                                    <li><strong>ChatGPT</strong> - chat.openai.com</li>
-                                    <li><strong>Claude</strong> - claude.ai</li>
-                                    <li><strong>Perplexity</strong> - perplexity.ai</li>
-                                    <li><strong>Google Gemini</strong> - gemini.google.com</li>
-                                    <li><strong>Microsoft Copilot</strong> - copilot.microsoft.com</li>
-                                    <li><strong>GPT-NL.com</strong> - gpt-nl.com</li>
-                                </ul>
-                                <p className="text-sm text-blue-700 mt-3 italic">
-                                    💡 Tip: Test de prompt bij meerdere chatbots voor een breder overzicht van beschikbare tools!
-                                </p>
-                            </div>
-                            <div className="mb-6 bg-green-50 border-l-4 border-green-600 p-6 rounded-lg">
-                                <h3 className="font-semibold text-green-900 mb-3 flex items-center gap-2">
-                                    🔒 Privacy herinnering
-                                </h3>
-                                <div className="space-y-2 text-gray-700 text-sm">
-                                    <p>
-                                        Deze tool heeft geen data opgeslagen. De prompt die u nu kopieert bevat alleen de informatie die u zelf heeft ingevuld.
-                                    </p>
-                                    <p className="font-medium">
-                                        Let op: Zodra u deze prompt deelt met een AI-chatbot (ChatGPT, Claude, etc.), vallen uw gegevens onder het privacybeleid van die dienst. Controleer de prompt en verwijder eventueel gevoelige informatie voordat u deze deelt.
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex gap-4">
-                                <button onClick={copyToClipboard}
-                                    className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-semibold">
-                                    📋 Kopieer Prompt
-                                </button>
-                                <button onClick={resetTool}
-                                    className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 font-semibold">
-                                    🔄 Opnieuw Beginnen
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-
-            return (
-                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-                    <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-xl p-8">
-                        <div className="flex items-center gap-3 mb-6">
-                            <span className="text-4xl">🚚</span>
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-800">AI Tool Finder voor Logistiek</h1>
-                                <p className="text-gray-600">Vind de juiste AI-oplossing voor uw bedrijf</p>
-                            </div>
-                        </div>
-
-                        {currentScreen === 'intro' ? (
-                            <div>
-                                <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-600 p-8 rounded-lg">
-                                    <h2 className="text-2xl font-bold text-blue-900 mb-4">💡 Welkom bij de AI Tool Finder voor Logistiek</h2>
-                                    <div className="space-y-4 text-gray-700 leading-relaxed">
-                                        <p>Deze tool helpt u bij het vinden van geschikte AI-tools voor uw logistieke processen.</p>
-                                        <div className="bg-white p-4 rounded-lg border border-blue-200">
-                                            <h3 className="font-semibold text-blue-900 mb-2">🔍 Hoe werkt het?</h3>
-                                            <ol className="list-decimal list-inside space-y-2 ml-2">
-                                                <li>U beantwoordt een aantal vragen over uw bedrijf, doelen en eisen</li>
-                                                <li>De tool genereert een <strong>gepersonaliseerde zoekprompt</strong> op basis van uw antwoorden</li>
-                                                <li>U kunt deze prompt kopiëren en plakken in een AI-chatbot zoals:
-                                                    <ul className="list-disc list-inside ml-6 mt-1 text-gray-600">
-                                                        <li>ChatGPT</li>
-                                                        <li>Claude</li>
-                                                        <li>Perplexity</li>
-                                                        <li>Google Gemini</li>
-                                                        <li>Microsoft Copilot</li>
-                                                        <li>GPT-NL.com</li>
-                                                    </ul>
-                                                </li>
-                                                <li>De chatbot helpt u vervolgens de beste AI-tools voor uw specifieke situatie te vinden</li>
-                                            </ol>
-                                        </div>
-                                        <p className="text-sm text-gray-600 italic">💡 Het duurt ongeveer 5-12 minuten om alle vragen te beantwoorden.</p>
-                                    </div>
-                                </div>
-                                <div className="mb-6 bg-green-50 border-l-4 border-green-600 p-6 rounded-lg">
-                                    <h3 className="font-semibold text-green-900 mb-3 flex items-center gap-2">
-                                        🔒 Privacy informatie
-                                    </h3>
-                                    <div className="space-y-2 text-gray-700 text-sm">
-                                        <p>
-                                            Deze vragenlijst tool verzamelt geen data en slaat niets op. Uw antwoorden worden alleen gebruikt om een tekstprompt te genereren die u zelf kopieert.
-                                        </p>
-                                        <p className="font-medium">
-                                            Let op: Als u de gegenereerde prompt deelt met een externe AI-chatbot (ChatGPT, Claude, etc.), vallen uw gegevens onder het privacybeleid van die dienst. Deel alleen informatie waar u comfortabel mee bent.
-                                        </p>
-                                    </div>
-                                </div>
-                                <button onClick={() => setCurrentScreen('tips')}
-                                    className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-lg">
-                                    Tips voordat u begint →
-                                </button>
-                            </div>
-                        ) : currentScreen === 'tips' ? (
-                            <div>
-                                <div className="mb-6 bg-gradient-to-r from-green-50 to-teal-50 border-l-4 border-green-600 p-8 rounded-lg">
-                                    <h2 className="text-2xl font-bold text-green-900 mb-4">💡 Tips voordat u begint</h2>
-                                    <div className="space-y-4 text-gray-700 leading-relaxed">
-                                        <p>Om het maximale uit deze tool te halen, hebben we een aantal handige tips voor u:</p>
-                                        <div className="bg-white p-4 rounded-lg border border-green-200">
-                                            <h3 className="font-semibold text-green-900 mb-3">📝 Aanbevelingen:</h3>
-                                            <ul className="space-y-3">
-                                                <li className="flex gap-3">
-                                                    <span className="text-green-600 font-bold mt-1">1.</span>
-                                                    <div><strong>Wees zo compleet mogelijk:</strong> Hoe uitgebreider en specifieker u de vragen beantwoordt, hoe relevanter en gerichter de aanbevolen AI-tools zullen zijn. Neem de tijd om uw situatie goed te beschrijven.</div>
-                                                </li>
-                                                <li className="flex gap-3">
-                                                    <span className="text-green-600 font-bold mt-1">2.</span>
-                                                    <div><strong>Test bij meerdere AI-chatbots:</strong> We raden aan om de gegenereerde prompt uit te proberen bij verschillende AI-assistenten (zoals ChatGPT, Claude, Perplexity en Google Gemini). Elk platform heeft toegang tot andere bronnen en kan unieke tool-suggesties geven, waardoor u een breder overzicht krijgt.</div>
-                                                </li>
-                                                <li className="flex gap-3">
-                                                    <span className="text-green-600 font-bold mt-1">3.</span>
-                                                    <div><strong>U kunt vragen overslaan:</strong> Als u bij een vraag het antwoord niet weet of liever niet invult, kunt u deze overslaan. Houd er wel rekening mee dat dit de kwaliteit van de aanbevelingen kan beïnvloeden.</div>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex gap-4">
-                                    <button onClick={() => setCurrentScreen('intro')}
-                                        className="flex items-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold">
-                                        ← Terug
-                                    </button>
-                                    <button onClick={() => {setCurrentScreen('questions'); setQuestionStep(0);}}
-                                        className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-lg">
-                                        Begin met vragenlijst →
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="mb-8">
-                                    <div className="w-full bg-gray-200 rounded-full h-2">
-                                        <div className="bg-blue-600 h-2 rounded-full transition-all" style={{width: `${progress}%`}}></div>
-                                    </div>
-                                    <p className="text-sm text-gray-600 mt-2">Vraag {questionStep + 1} van {questions.length}</p>
-                                </div>
-                                {currentQuestion && (
-                                    <div className="mb-8">
-                                        <h2 className="text-xl font-semibold text-gray-800 mb-4">{currentQuestion.question}</h2>
-                                        {currentQuestion.hasInfo && (
-                                            <button onClick={() => {setViewingProcessInfo(true); setProcessInfoStep(0);}}
-                                                className="mb-4 px-6 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-semibold w-full">
-                                                📖 Bekijk uitleg van alle processen
-                                            </button>
-                                        )}
-                                        {currentQuestion.type === 'text' && (
-                                            <input type="text" value={formData[currentQuestion.id] || ''}
-                                                onChange={(e) => setFormData({...formData, [currentQuestion.id]: e.target.value})}
-                                                placeholder={currentQuestion.placeholder}
-                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                                        )}
-                                        {currentQuestion.type === 'textarea' && (
-                                            <textarea value={formData[currentQuestion.id] || ''}
-                                                onChange={(e) => setFormData({...formData, [currentQuestion.id]: e.target.value})}
-                                                placeholder={currentQuestion.placeholder} rows={4}
-                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                                        )}
-                                        {currentQuestion.type === 'select' && (
-                                            <select value={formData[currentQuestion.id] || ''}
-                                                onChange={(e) => setFormData({...formData, [currentQuestion.id]: e.target.value})}
-                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                                <option value="">-- Maak een keuze --</option>
-                                                {currentQuestion.options.map((option, index) => (
-                                                    <option key={index} value={option}>{option}</option>
-                                                ))}
-                                            </select>
-                                        )}
-                                        {currentQuestion.type === 'multiselect' && (
-                                            <div className="space-y-2">
-                                                {currentQuestion.options.map((option, index) => {
-                                                    const isSelected = (formData[currentQuestion.id] || []).includes(option);
-                                                    return (
-                                                        <label key={index} className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-300'}`}>
-                                                            <input type="checkbox" checked={isSelected}
-                                                                onChange={() => handleMultiSelectChange(currentQuestion.id, option)}
-                                                                className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" />
-                                                            <span className="text-gray-700">{option}</span>
-                                                        </label>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                                <div className="flex gap-4">
-                                    <button onClick={prevStep}
-                                        className="flex items-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold">
-                                        ← Vorige
-                                    </button>
-                                    <button onClick={skipQuestion}
-                                        className="px-6 py-3 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 font-semibold">
-                                        ⏭️ Overslaan
-                                    </button>
-                                    {currentQuestion && (
-                                        <button onClick={nextStep} 
-                                            disabled={currentQuestion.optional ? false : (currentQuestion.type === 'multiselect' ? (!formData[currentQuestion.id] || formData[currentQuestion.id].length === 0) : !formData[currentQuestion.id])}
-                                            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed">
-                                            {questionStep === questions.length - 1 ? 'Genereer Prompt' : 'Volgende'} →
-                                        </button>
-                                    )}
-                                </div>
-                            </>
-                        )}
-                    </div>
+    if (screen === 'intro') {
+        app.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-xl p-8 mt-6 fade">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="text-4xl">🚚</span>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">AI Tool Finder voor Logistiek</h1>
+                    <p class="text-gray-500">Vind de juiste AI-oplossing voor uw bedrijf</p>
                 </div>
-            );
-        }
+            </div>
+            <div class="bg-blue-50 border-l-4 border-blue-600 p-6 rounded-lg mb-6">
+                <h2 class="font-bold text-blue-900 mb-3">💡 Hoe werkt het?</h2>
+                <ol class="list-decimal list-inside space-y-2 text-gray-700">
+                    <li>Beantwoord vragen over uw bedrijf en doelen</li>
+                    <li>De tool genereert een gepersonaliseerde zoekprompt</li>
+                    <li>Plak de prompt in ChatGPT, Claude, Perplexity of Gemini</li>
+                    <li>De chatbot vindt de beste AI-tools voor uw situatie</li>
+                </ol>
+                <p class="text-sm text-gray-500 mt-3 italic">Duurt ongeveer 5-12 minuten</p>
+            </div>
+            <div class="bg-green-50 border-l-4 border-green-600 p-4 rounded-lg mb-6 text-sm text-gray-700">
+                <strong>🔒 Privacy:</strong> Er wordt geen data opgeslagen. Uw antwoorden worden alleen gebruikt om een tekstprompt te genereren.
+            </div>
+            <button onclick="goTo('tips')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl text-lg transition">
+                Tips bekijken →
+            </button>
+        </div>`;
+        return;
+    }
 
-        ReactDOM.createRoot(document.getElementById('root')).render(<TransportAIToolFinder />);
-    </script>
+    if (screen === 'tips') {
+        app.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-xl p-8 mt-6 fade">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="text-4xl">💡</span>
+                <h2 class="text-2xl font-bold text-gray-800">Tips voordat u begint</h2>
+            </div>
+            <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-lg mb-6">
+                <ul class="space-y-4 text-gray-700">
+                    <li><strong>1. Wees zo compleet mogelijk</strong> — Hoe specifieker u antwoordt, hoe relevanter de aanbevelingen.</li>
+                    <li><strong>2. Test bij meerdere chatbots</strong> — ChatGPT, Claude, Perplexity en Gemini geven elk unieke suggesties.</li>
+                    <li><strong>3. Vragen overslaan kan</strong> — Gebruik de overslaan-knop als u een antwoord niet weet.</li>
+                </ul>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="goTo('intro')" class="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition">← Terug</button>
+                <button onclick="startQuestions()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition">Begin met vragenlijst →</button>
+            </div>
+        </div>`;
+        return;
+    }
+
+    if (screen === 'result') {
+        app.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-xl p-8 mt-6 fade">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="text-4xl">📄</span>
+                <h2 class="text-2xl font-bold text-gray-800">Uw gepersonaliseerde zoekprompt</h2>
+            </div>
+            <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 max-h-80 overflow-y-auto">
+                <pre class="whitespace-pre-wrap text-sm text-gray-700 font-mono">${escHtml(state.prompt)}</pre>
+            </div>
+            <div class="bg-blue-50 border-l-4 border-blue-600 p-5 rounded-lg mb-4">
+                <p class="font-semibold text-blue-900 mb-2">📋 Volgende stap</p>
+                <p class="text-gray-700 text-sm">Kopieer de prompt en plak deze in: <strong>ChatGPT</strong>, <strong>Claude</strong>, <strong>Perplexity</strong>, <strong>Google Gemini</strong> of <strong>Microsoft Copilot</strong>.</p>
+            </div>
+            <div class="bg-green-50 border-l-4 border-green-600 p-4 rounded-lg mb-6 text-sm text-gray-700">
+                <strong>🔒 Let op:</strong> Zodra u de prompt deelt met een AI-chatbot, vallen uw gegevens onder het privacybeleid van die dienst.
+            </div>
+            <div class="flex gap-3">
+                <button onclick="copyPrompt()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition">📋 Kopieer prompt</button>
+                <button onclick="reset()" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 rounded-xl transition">🔄 Opnieuw</button>
+            </div>
+        </div>`;
+        return;
+    }
+
+    // Questions screen
+    const q = questions[step];
+    const totalVisible = questions.filter(isQuestionVisible).length;
+    const visibleIndex = questions.slice(0, step + 1).filter(isQuestionVisible).length;
+    const progress = (visibleIndex / totalVisible) * 100;
+    const val = formData[q.id];
+    const isEmpty = q.type === 'multiselect' ? (!val || val.length === 0) : !val;
+    const canNext = q.optional || !isEmpty;
+
+    let inputHtml = '';
+    if (q.type === 'text') {
+        inputHtml = `<input type="text" id="qinput" value="${escHtml(val || '')}" placeholder="${escHtml(q.placeholder || '')}"
+            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-800"
+            oninput="setVal('${q.id}', this.value)" />`;
+    } else if (q.type === 'textarea') {
+        inputHtml = `<textarea id="qinput" rows="4" placeholder="${escHtml(q.placeholder || '')}"
+            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-800 resize-none"
+            oninput="setVal('${q.id}', this.value)">${escHtml(val || '')}</textarea>`;
+    } else if (q.type === 'select') {
+        const opts = q.options.map(o => `<option value="${escHtml(o)}" ${val === o ? 'selected' : ''}>${escHtml(o)}</option>`).join('');
+        inputHtml = `<select id="qinput" onchange="setVal('${q.id}', this.value)"
+            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-800 bg-white">
+            <option value="">-- Maak een keuze --</option>${opts}</select>`;
+    } else if (q.type === 'multiselect') {
+        const selected = val || [];
+        inputHtml = q.options.map(o => {
+            const isSel = selected.includes(o);
+            return `<label class="flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition ${isSel ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}">
+                <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleMulti('${q.id}', '${escHtml(o)}')"
+                    class="w-5 h-5 text-blue-600 rounded" />
+                <span class="text-gray-700">${escHtml(o)}</span>
+            </label>`;
+        }).join('');
+    }
+
+    const prevStep = getVisibleStep(step, -1);
+    const nextStep = getVisibleStep(step, 1);
+
+    app.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-xl p-8 mt-6 fade">
+        <div class="flex items-center gap-3 mb-6">
+            <span class="text-4xl">🚚</span>
+            <div>
+                <h1 class="text-xl font-bold text-gray-800">AI Tool Finder voor Logistiek</h1>
+                <p class="text-gray-500 text-sm">Vind de juiste AI-oplossing voor uw bedrijf</p>
+            </div>
+        </div>
+        <div class="mb-6">
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                <div class="bg-blue-600 h-2 rounded-full transition-all" style="width:${progress}%"></div>
+            </div>
+            <p class="text-sm text-gray-500 mt-1">Stap ${visibleIndex} van ${totalVisible}</p>
+        </div>
+        <div class="mb-8">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">${escHtml(q.question)}</h2>
+            <div class="space-y-2">${inputHtml}</div>
+        </div>
+        <div class="flex gap-3">
+            ${prevStep >= 0 || state.screen === 'questions' && step === questions.findIndex(isQuestionVisible)
+                ? `<button onclick="prevQ(${prevStep})" class="flex items-center gap-1 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition">← Vorige</button>`
+                : `<button onclick="goTo('tips')" class="flex items-center gap-1 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition">← Terug</button>`
+            }
+            <button onclick="skipQ()" class="px-4 py-3 bg-yellow-50 hover:bg-yellow-100 text-yellow-800 font-semibold rounded-xl transition text-sm">⏭ Overslaan</button>
+            <button onclick="nextQ(${nextStep})" ${canNext ? '' : 'disabled'}
+                class="flex-1 py-3 px-6 rounded-xl font-semibold transition ${canNext ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}">
+                ${nextStep < 0 ? 'Genereer prompt ✓' : 'Volgende →'}
+            </button>
+        </div>
+    </div>`;
+}
+
+function escHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function goTo(s) { state.screen = s; render(); }
+
+function startQuestions() {
+    state.screen = 'questions';
+    state.step = questions.findIndex(isQuestionVisible);
+    render();
+}
+
+function setVal(id, val) {
+    state.formData[id] = val;
+    // Re-enable next button without full re-render for text inputs
+    const btn = document.querySelector('button[onclick^="nextQ"]');
+    if (btn) {
+        const q = questions[state.step];
+        const isEmpty = !val;
+        const canNext = q.optional || !isEmpty;
+        btn.disabled = !canNext;
+        btn.className = `flex-1 py-3 px-6 rounded-xl font-semibold transition ${canNext ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`;
+    }
+}
+
+function toggleMulti(id, option) {
+    const cur = state.formData[id] || [];
+    state.formData[id] = cur.includes(option) ? cur.filter(v => v !== option) : [...cur, option];
+    render();
+}
+
+function nextQ(nextStep) {
+    const q = questions[state.step];
+    const val = state.formData[q.id];
+    const isEmpty = q.type === 'multiselect' ? (!val || val.length === 0) : !val;
+    if (!q.optional && isEmpty) return;
+    if (nextStep < 0) {
+        state.prompt = generatePrompt();
+        state.screen = 'result';
+    } else {
+        state.step = nextStep;
+    }
+    render();
+}
+
+function skipQ() {
+    const next = getVisibleStep(state.step, 1);
+    if (next < 0) {
+        state.prompt = generatePrompt();
+        state.screen = 'result';
+    } else {
+        state.step = next;
+    }
+    render();
+}
+
+function prevQ(prevStep) {
+    if (prevStep < 0) { goTo('tips'); return; }
+    state.step = prevStep;
+    render();
+}
+
+function reset() {
+    state.screen = 'intro';
+    state.step = 0;
+    state.formData = {};
+    state.prompt = '';
+    render();
+}
+
+function copyPrompt() {
+    navigator.clipboard.writeText(state.prompt).then(() => alert('Prompt gekopieerd naar klembord!')).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = state.prompt;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('Prompt gekopieerd!');
+    });
+}
+
+render();
+</script>
 </body>
 </html>
